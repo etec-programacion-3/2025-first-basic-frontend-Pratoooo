@@ -2,111 +2,113 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Libreria</title>
+    <title>Gestión de Productos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+        input, textarea {
+            margin: 5px;
+            padding: 5px;
+        }
+        button {
+            padding: 6px 12px;
+            margin: 5px;
+        }
+        .producto {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
-    <div>
-        <h1>Librería</h1>
-        <form id="formulario_libros">
-            <input type="text" id="titulo" placeholder="Título" required>
-            <input type="text" id="autor" placeholder="Autor" required>
-            <input type="number" id="anio" placeholder="Año" required>
-            <input type="text" id="genero" placeholder="Género" required>
-            <button type="submit">Agregar Libro</button>
-        </form>
-        <table id="tabla_libros">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Título</th>
-                    <th>Autor</th>
-                    <th>Año</th>
-                    <th>Género</th>
-                </tr>
-            </thead>
-            <tbody id="cuerpo_tabla"></tbody>
-        </table>
-        <div id="mensaje"></div>
-     </div>
-     <script>
+    <h1>Gestión de Productos</h1>
 
-        const baseUrl = 'http://127.0.0.1:8000';
-        const formulario = document.getElementById("formulario_libros");
-        const tabla = document.getElementById("cuerpo_tabla");
+    <h2>Agregar Producto</h2>
+    <form id="form-agregar">
+        <input type="text" id="name" placeholder="Nombre" required><br>
+        <input type="number" id="price" placeholder="Precio" required step="0.01"><br>
+        <textarea id="description" placeholder="Descripción"></textarea><br>
+        <button type="submit">Agregar</button>
+    </form>
 
-        const inputTitulo = document.getElementById("titulo");
-        const inputAutor = document.getElementById("autor");
-        const inputAnio = document.getElementById("anio");
-        const inputGenero = document.getElementById("genero");
+    <h2>Lista de Productos</h2>
+    <div id="productos"></div>
 
-        const mensaje = document.getElementById("mensaje");
+    <script>
+        const API_URL = 'http://localhost:3000/api/products';
 
-        
-        function mostrarMensaje(texto){
-            mensaje.innerHTML = "<div>" + texto + "</div>";
-            setTimeout(() => mensaje.innerHTML = '', 3000);
+        const formAgregar = document.getElementById('form-agregar');
+        const productosDiv = document.getElementById('productos');
+
+        formAgregar.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const price = parseFloat(document.getElementById('price').value);
+            const description = document.getElementById('description').value;
+
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, price, description })
+            });
+
+            if (res.ok) {
+                formAgregar.reset();
+                cargarProductos();
+            } else {
+                alert('Error al agregar producto');
+            }
+        });
+
+        async function cargarProductos() {
+            productosDiv.innerHTML = '';
+            const res = await fetch(API_URL);
+            const productos = await res.json();
+
+            productos.forEach(prod => {
+                const div = document.createElement('div');
+                div.className = 'producto';
+                div.innerHTML = `
+                    <strong>${prod.name}</strong><br>
+                    Precio: $${prod.price.toFixed(2)}<br>
+                    Descripción: ${prod.description || 'Sin descripción'}<br>
+                    <button onclick="eliminarProducto(${prod.id})">Eliminar</button>
+                    <button onclick='editarProducto(${JSON.stringify(prod)})'>Editar</button>
+                `;
+                productosDiv.appendChild(div);
+            });
         }
 
-        async function cargarLibros(){
-            try {
-                const respuesta = await fetch(baseUrl);
-                const libros = await respuesta.json();
-                tabla.innerHTML = "";
-                libros.forEach(libro => {
-                    const tr = document.createElement("tr");
-                    tr.innerHTML = `
-                        <td>${libro.id}</td>
-                        <td>${libro.titulo}</td>
-                        <td>${libro.autor}</td>
-                        <td>${libro.anio}</td>
-                        <td>${libro.genero}</td>
-                        <td><button onclick="borrarLibro(${libro.id})">Borrar</button></td>
-                    `;
-                    tabla.appendChild(tr);
-                });
+        async function eliminarProducto(id) {
+            if (confirm('¿Seguro que deseas eliminar este producto?')) {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                cargarProductos();
             }
-            catch (error) {mostrarMensaje("Error al cargar los libros");}
         }
 
-        formulario.onsubmit = async function (event) {
-            event.preventDefault();
-            const nuevo_libro = {
-                id: null,
-                titulo: inputTitulo.value.trim(),
-                autor: inputAutor.value.trim(),
-                anio: parseInt(inputAnio.value),
-                genero: inputGenero.value.trim()
+        function editarProducto(prod) {
+            const nuevoNombre = prompt('Nuevo nombre:', prod.name);
+            const nuevoPrecio = prompt('Nuevo precio:', prod.price);
+            const nuevaDescripcion = prompt('Nueva descripción:', prod.description);
+
+            if (nuevoNombre && nuevoPrecio) {
+                fetch(`${API_URL}/${prod.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: nuevoNombre,
+                        price: parseFloat(nuevoPrecio),
+                        description: nuevaDescripcion
+                    })
+                }).then(() => cargarProductos());
             }
-            try {
-                const respuesta = await fetch(baseUrl,{
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(nuevo_libro)
-                })
-                const libro = await respuesta.json();
-                mostrarMensaje("Libro agregado");
-                if (!respuesta.ok) throw new Error("Error al agregar el libro");
-                formulario.reset();
-                cargarLibros();
-            }
-            catch (error) {mostrarMensaje("Error al agregar el libro");}
-        }
-        
-        window.borrarLibro = async function (id){
-            if (!confirm("¿Borrar este libro?")) return;
-            try {
-                const respuesta = await fetch(`${baseUrl}/${id}`, {method: 'DELETE'});
-                if (!respuesta.ok) throw new Error("Error al borrar el libro");
-                mostrarMensaje("Libro borrado");
-                cargarLibros();
-            }
-            catch (error) {mostrarMensaje("Error al borrar el libro");}
         }
 
-        cargarLibros();
-
-     </script>
+        // Cargar productos al iniciar
+        cargarProductos();
+    </script>
 </body>
-
-        
 </html>
