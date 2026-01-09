@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Productos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        }
+        input, textarea {
+            margin: 5px;
+            padding: 5px;
+        }
+        button {
+            padding: 6px 12px;
+            margin: 5px;
+        }
+        .producto {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Gestión de Productos</h1>
+
+    <h2>Agregar Producto</h2>
+    <form id="form-agregar">
+        <input type="text" id="name" placeholder="Nombre" required><br>
+        <input type="number" id="price" placeholder="Precio" required step="0.01"><br>
+        <textarea id="description" placeholder="Descripción"></textarea><br>
+        <button type="submit">Agregar</button>
+    </form>
+
+    <h2>Lista de Productos</h2>
+    <div id="productos"></div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/api/products';
+
+        const formAgregar = document.getElementById('form-agregar');
+        const productosDiv = document.getElementById('productos');
+
+        formAgregar.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('name').value;
+            const price = parseFloat(document.getElementById('price').value);
+            const description = document.getElementById('description').value;
+
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, price, description })
+            });
+
+            if (res.ok) {
+                formAgregar.reset();
+                cargarProductos();
+            } else {
+                alert('Error al agregar producto');
+            }
+        });
+
+        async function cargarProductos() {
+            productosDiv.innerHTML = '';
+            const res = await fetch(API_URL);
+            const productos = await res.json();
+
+            productos.forEach(prod => {
+                const div = document.createElement('div');
+                div.className = 'producto';
+                div.innerHTML = `
+                    <strong>${prod.name}</strong><br>
+                    Precio: $${prod.price.toFixed(2)}<br>
+                    Descripción: ${prod.description || 'Sin descripción'}<br>
+                    <button onclick="eliminarProducto(${prod.id})">Eliminar</button>
+                    <button onclick='editarProducto(${JSON.stringify(prod)})'>Editar</button>
+                `;
+                productosDiv.appendChild(div);
+            });
+        }
+
+        async function eliminarProducto(id) {
+            if (confirm('¿Seguro que deseas eliminar este producto?')) {
+                await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+                cargarProductos();
+            }
+        }
+
+        function editarProducto(prod) {
+            const nuevoNombre = prompt('Nuevo nombre:', prod.name);
+            const nuevoPrecio = prompt('Nuevo precio:', prod.price);
+            const nuevaDescripcion = prompt('Nueva descripción:', prod.description);
+
+            if (nuevoNombre && nuevoPrecio) {
+                fetch(`${API_URL}/${prod.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: nuevoNombre,
+                        price: parseFloat(nuevoPrecio),
+                        description: nuevaDescripcion
+                    })
+                }).then(() => cargarProductos());
+            }
+        }
+
+        // Cargar productos al iniciar
+        cargarProductos();
+    </script>
+</body>
+</html>
